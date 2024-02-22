@@ -1,18 +1,25 @@
 const std = @import("std");
+const args = @import("input/args.zig");
 const FoundItem = struct {
     line_number: usize,
     line: []const u8,
 };
 
 pub fn main() !void {
+    // NOTE: std.os.args does not work on windows or wasi
+    const cliArgs = std.os.argv;
+    const parsedArgs = args.parseArgs(cliArgs);
     const allocator = std.heap.page_allocator;
-    var i: usize = 1;
     var found = std.ArrayList(FoundItem).init(allocator);
+    defer found.deinit();
+
     try search(parsedArgs.text, parsedArgs.search_for, &found);
     // TODO: This is just for debugging purposes, need to implement actual output to sdtout
     for (found.items) |item| {
         std.debug.print("{d} {s}\n", .{ item.line_number, item.line });
     }
+}
+
 // Takes a string to be searched and a string to search for. It will return
 // a modified version of the to_seach with all the instances of search_for highlighted
 // NOTE: It might be useful to update this to also return some statistics about the search,
