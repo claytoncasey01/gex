@@ -9,7 +9,7 @@ pub fn main() !void {
     // NOTE: std.os.args does not work on windows or wasi
     const cliArgs = std.os.argv;
     const parsedArgs = args.parseArgs(cliArgs);
-    const allocator = std.heap.page_allocator;
+    const allocator = std.heap.ArenaAllocator;
     var found = std.ArrayList(FoundItem).init(allocator);
     defer found.deinit();
 

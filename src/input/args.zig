@@ -12,15 +12,15 @@ pub fn parseArgs(args: [][*:0]u8) Args {
     };
 
     if (args.len > 2) {
+        // Pull out the search_for and text args right away, any additonal flags will come after these 2
         parsed_args.search_for = std.mem.span(args[1]);
         parsed_args.text = std.mem.span(args[2]);
 
         for (args[3..]) |arg| {
             const args_enum = std.meta.stringToEnum(PossibleArgs, std.mem.span(arg)) orelse break;
             switch (args_enum) {
-                .@"-v" => parsed_args.verbose = true,
-                .@"-h" => parsed_args.help = true,
-                else => std.debug.print("Argument: {s}\n", .{arg}),
+                .@"-v", .@"--verbose" => parsed_args.verbose = true,
+                .@"-h", .@"--help" => parsed_args.help = true,
             }
         }
     } else {
