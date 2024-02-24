@@ -1,22 +1,33 @@
 const std = @import("std");
 const args = @import("input/args.zig");
-const FoundItem = struct {
-    line_number: usize,
-    line: []const u8,
-};
+const FoundItem = @import("shared/types.zig").FoundItem;
+const fileHandler = @import("input/file.zig");
 
 pub fn main() !void {
     // NOTE: std.os.args does not work on windows or wasi
     const cliArgs = std.os.argv;
     const parsedArgs = args.parseArgs(cliArgs);
-    const allocator = std.heap.ArenaAllocator;
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
     var found = std.ArrayList(FoundItem).init(allocator);
     defer found.deinit();
 
-    try search(parsedArgs.text, parsedArgs.search_for, &found);
+    // In this case we most likely are dealing with a file or directory, just assume so for now
+    if (std.fs.cwd().statFile(parsedArgs.text)) |stat| {
+        switch (stat.kind) {
+            .directory => std.debug.print("{s} is a directory\n", .{parsedArgs.text}),
+            .file => try fileHandler.search_file(parsedArgs.text, parsedArgs.search_for, &found),
+            else => std.debug.print("{s} is not a file or directory\n", .{parsedArgs.text}),
+        }
+    } else |err| switch (err) {
+        error.FileNotFound => try search(parsedArgs.text, parsedArgs.search_for, &found),
+        else => std.debug.print("An error occured", .{}),
+    }
+
     // TODO: This is just for debugging purposes, need to implement actual output to sdtout
     for (found.items) |item| {
-        std.debug.print("{d} {s}\n", .{ item.line_number, item.line });
+        std.debug.print("{d} {s} {d}\n", .{ item.line_number, item.line, item.index });
     }
 }
 
@@ -33,7 +44,7 @@ fn search(to_search: []const u8, search_for: []const u8, found: *std.ArrayList(F
         indexOf = std.mem.indexOf(u8, line, search_for) orelse continue;
 
         if (indexOf > 0) {
-            try found.append(FoundItem{ .line_number = cursor, .line = line });
+            try found.append(FoundItem{ .line_number = cursor, .line = line, .index = indexOf });
             cursor += 1;
         }
     }
