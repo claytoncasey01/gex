@@ -2,12 +2,14 @@ const std = @import("std");
 const args = @import("input/args.zig");
 const FoundItem = @import("shared/types.zig").FoundItem;
 const fileHandler = @import("input/file.zig");
+const formatter = @import("output/formatter.zig");
 
 pub fn main() !void {
     // NOTE: std.os.args does not work on windows or wasi
     const cliArgs = std.os.argv;
     const parsedArgs = args.parseArgs(cliArgs);
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .verbose_log = true }){};
+    // defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
 
     var found = std.ArrayList(FoundItem).init(allocator);
@@ -24,7 +26,6 @@ pub fn main() !void {
         error.FileNotFound => try search(parsedArgs.text, parsedArgs.search_for, &found),
         else => std.debug.print("An error occured", .{}),
     }
-
     // TODO: This is just for debugging purposes, need to implement actual output to sdtout
     for (found.items) |item| {
         std.debug.print("{d} {s} {d}\n", .{ item.line_number, item.line, item.index });
@@ -36,16 +37,22 @@ pub fn main() !void {
 // NOTE: It might be useful to update this to also return some statistics about the search,
 // like the number of matches, the indexes of the matches, etc.
 fn search(to_search: []const u8, search_for: []const u8, found: *std.ArrayList(FoundItem)) !void {
+    const allocator = found.allocator;
     var to_search_lines = std.mem.splitSequence(u8, to_search, "\n");
     var cursor: usize = 1;
     var indexOf: usize = undefined;
 
     while (to_search_lines.next()) |line| {
         indexOf = std.mem.indexOf(u8, line, search_for) orelse continue;
+        const colorized_line = try formatter.colorizeWord(line, formatter.Color.green, search_for, allocator);
 
         if (indexOf > 0) {
-            try found.append(FoundItem{ .line_number = cursor, .line = line, .index = indexOf });
+            try found.append(FoundItem{ .line_number = cursor, .line = colorized_line, .index = indexOf });
             cursor += 1;
         }
     }
+}
+
+test {
+    std.testing.refAllDecls(@This());
 }

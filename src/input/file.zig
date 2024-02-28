@@ -2,7 +2,9 @@ const std = @import("std");
 const io = std.io;
 const fs = std.fs;
 const FoundItem = @import("../shared/types.zig").FoundItem;
+const formatter = @import("../output/formatter.zig");
 
+// TODO: This seems to be broken when trying to use colorizeWord, should probably figure it out
 pub fn search_file(path: []const u8, search_for: []const u8, results: *std.ArrayList(FoundItem)) !void {
     const allocator = results.allocator;
     var file = try fs.cwd().openFile(path, .{});

@@ -14,17 +14,53 @@ pub const Color = enum(u8) {
     }
 };
 
-// TODO: Make this work
-pub fn colorizeWord(str: []const u8, color: Color, word: []const u8, allocator: *const std.mem.Allocator) []const u8 {
-
-    // Calculate the length of the colorized string
+// NOTE: This works but it may not be the most efficient way to do this.
+pub fn colorizeWord(str: []const u8, color: Color, word: []const u8, allocator: std.mem.Allocator) ![]const u8 {
     const color_code = color.getCode();
     const reset_code = Color.reset.getCode();
-    const result_len = color_code.len + str.len + reset_code.len;
-    const result = try allocator.alloc(u8, result_len);
-    const colorized_word: []const u8 = color.getCode() + word + Color.reset.getCode();
 
-    std.mem.replaceScalar(u8, result, word, colorized_word);
+    // Calculate the total occurences of `word` in `str`
+    var occurrences: usize = 0;
+    var i: usize = 0;
+    while (i < str.len) : (i += 1) {
+        if (std.mem.startsWith(u8, str[i..], word)) {
+            occurrences += 1;
+            i += word.len - 1;
+        }
+    }
 
-    return result;
+    // Calculate the length and allocate memory for the final colorized string
+    const extra_len_per_occurrence = color_code.len + reset_code.len;
+    const result_string_len = str.len + (extra_len_per_occurrence * occurrences);
+    var result_string = try allocator.alloc(u8, result_string_len);
+
+    // Construct the `result_string` with colorized words
+    var result_index: usize = 0;
+    i = 0;
+    while (i < str.len) {
+        if (std.mem.startsWith(u8, str[i..], word)) {
+            std.mem.copyForwards(u8, result_string[result_index..][0..color_code.len], color_code);
+            result_index += color_code.len;
+            std.mem.copyForwards(u8, result_string[result_index..][0..word.len], word);
+            result_index += word.len;
+            std.mem.copyForwards(u8, result_string[result_index..][0..reset_code.len], reset_code);
+            result_index += reset_code.len;
+            i += word.len;
+        } else {
+            result_string[result_index] = str[i];
+            result_index += 1;
+            i += 1;
+        }
+    }
+
+    return result_string;
+}
+
+test "colorizeWord" {
+    const allocator = std.testing.allocator;
+    const str = "Hello, world!";
+    const word = "world";
+    const colorized = try colorizeWord(str, Color.green, word, allocator);
+    defer allocator.free(colorized);
+    try std.testing.expectEqualStrings("Hello, \x1b[32mworld\x1b[0m!", colorized);
 }
