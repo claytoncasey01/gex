@@ -15,7 +15,7 @@ pub const Color = enum(u8) {
 };
 
 // NOTE: This works but it may not be the most efficient way to do this.
-pub fn colorizeWord(str: []const u8, color: Color, word: []const u8, allocator: std.mem.Allocator) ![]const u8 {
+pub fn colorizeWord(str: []const u8, word: []const u8, color: Color, allocator: std.mem.Allocator) ![]const u8 {
     const color_code = color.getCode();
     const reset_code = Color.reset.getCode();
 
