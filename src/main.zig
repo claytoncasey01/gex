@@ -26,9 +26,15 @@ pub fn main() !void {
         error.FileNotFound => try search(parsedArgs.text, parsedArgs.search_for, &found),
         else => std.debug.print("An error occured", .{}),
     }
-    // TODO: This is just for debugging purposes, need to implement actual output to sdtout
+    // TODO: This is just for debugging purposes, need to implement actual configurable way to output results
     for (found.items) |item| {
-        std.debug.print("{d} {s} {d}\n", .{ item.line_number, item.line, item.index });
+        const out = std.io.getStdOut();
+        var buf = std.io.bufferedWriter(out.writer());
+
+        var w = buf.writer();
+
+        try w.print("{d} {s}\n", .{ item.line_number, item.line });
+        try buf.flush();
     }
 }
 
