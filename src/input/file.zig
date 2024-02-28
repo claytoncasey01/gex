@@ -12,7 +12,7 @@ pub fn search_file(path: []const u8, search_for: []const u8, results: *std.Array
 
     var buf_reader = io.bufferedReader(file.reader());
     var in_stream = buf_reader.reader();
-    var buf: [1024]u8 = undefined;
+    var buf: [2048]u8 = undefined;
     var indexOf: ?usize = null;
     var line_number: u32 = 1;
 
@@ -21,7 +21,8 @@ pub fn search_file(path: []const u8, search_for: []const u8, results: *std.Array
 
         if (indexOf != null) {
             const line_copy = try allocator.dupe(u8, line);
-            try results.append(FoundItem{ .line_number = line_number, .line = line_copy, .index = indexOf.? });
+            const colorized = try formatter.colorizeWord(line_copy, formatter.Color.green, search_for, allocator);
+            try results.append(FoundItem{ .line_number = line_number, .line = colorized, .index = indexOf.? });
             indexOf = null;
         }
     }
