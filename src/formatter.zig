@@ -1,4 +1,6 @@
 const std = @import("std");
+const ArrayList = std.ArrayList;
+const FoundItem = @import("types.zig").FoundItem;
 
 pub const Color = enum(u8) {
     reset,
@@ -63,4 +65,27 @@ test "colorizeWord" {
     const colorized = try colorizeWord(str, Color.green, word, allocator);
     defer allocator.free(colorized);
     try std.testing.expectEqualStrings("Hello, \x1b[32mworld\x1b[0m!", colorized);
+}
+
+pub const WriteOptions = struct {
+    line_number: bool,
+};
+
+// TODO: Currently this only writes the output to the console in the same way
+// as we were. This needs to handle various arguments for writting in different ways
+// for example, normal strings or structured data.
+pub fn writeOutput(found_items: *ArrayList(FoundItem), options: WriteOptions) !void {
+    for (found_items.items) |item| {
+        const out = std.io.getStdOut();
+        var buf = std.io.bufferedWriter(out.writer());
+        var w = buf.writer();
+
+        // TODO: Brain not working, pull this check out of the loop if possible
+        if (options.line_number) {
+            try w.print("{d} {s}\n", .{ item.line_number, item.line });
+        } else {
+            try w.print("{s}\n", .{item.line});
+        }
+        try buf.flush();
+    }
 }
