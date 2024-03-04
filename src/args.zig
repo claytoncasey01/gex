@@ -1,5 +1,5 @@
 const std = @import("std");
-const Color = @import("formatter.zig").Color;
+const Color = @import("output.zig").Color;
 
 pub const Args = struct { verbose: bool, help: bool, text: []const u8, search_for: []const u8 };
 const PossibleArgs = enum { @"-v", @"--verbose", @"-h", @"--help" };

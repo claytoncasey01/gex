@@ -67,25 +67,28 @@ test "colorizeWord" {
     try std.testing.expectEqualStrings("Hello, \x1b[32mworld\x1b[0m!", colorized);
 }
 
-pub const WriteOptions = struct {
-    line_number: bool,
-};
+// Options for how the output is handled.
+// TODO: Look into possibly handling the colorize here instead of in the search functions.
+pub const OutputOptions = struct { line_number: bool = false, file_path: ?[]const u8, delimiter: []const u8 = "\n", color: Color = Color.green };
 
 // TODO: Currently this only writes the output to the console in the same way
 // as we were. This needs to handle various arguments for writting in different ways
 // for example, normal strings or structured data.
-pub fn writeOutput(found_items: *ArrayList(FoundItem), options: WriteOptions) !void {
-    for (found_items.items) |item| {
-        const out = std.io.getStdOut();
-        var buf = std.io.bufferedWriter(out.writer());
-        var w = buf.writer();
+pub fn writeOutput(found_items: *ArrayList(FoundItem), search_for: []const u8, options: OutputOptions) !void {
+    const allocator = found_items.allocator;
+    const out = std.io.getStdOut();
+    var buf = std.io.bufferedWriter(out.writer());
+    var w = buf.writer();
 
-        // TODO: Brain not working, pull this check out of the loop if possible
-        if (options.line_number) {
-            try w.print("{d} {s}\n", .{ item.line_number, item.line });
-        } else {
-            try w.print("{s}\n", .{item.line});
+    if (options.line_number) {
+        for (found_items.items) |item| {
+            try w.print("{d} {s}{s}", .{ item.line_number, try colorizeWord(item.line, search_for, options.color, allocator), options.delimiter });
+            try buf.flush();
         }
-        try buf.flush();
+    } else {
+        for (found_items.items) |item| {
+            try w.print("{s}{s}", .{ try colorizeWord(item.line, search_for, options.color, allocator), options.delimiter });
+            try buf.flush();
+        }
     }
 }

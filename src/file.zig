@@ -2,11 +2,11 @@ const std = @import("std");
 const io = std.io;
 const fs = std.fs;
 const FoundItem = @import("types.zig").FoundItem;
-const colorizeWord = @import("formatter.zig").colorizeWord;
-const Color = @import("formatter.zig").Color;
+const colorizeWord = @import("output.zig").colorizeWord;
+const Color = @import("output.zig").Color;
 
 // TODO: We will want to make the color configurable here.
-pub fn searchFile(path: []const u8, search_for: []const u8, color: ?Color, results: *std.ArrayList(FoundItem)) !void {
+pub fn searchFile(path: []const u8, search_for: []const u8, results: *std.ArrayList(FoundItem)) !void {
     const allocator = results.allocator;
     var file = try fs.cwd().openFile(path, .{});
     defer file.close();
@@ -22,8 +22,7 @@ pub fn searchFile(path: []const u8, search_for: []const u8, color: ?Color, resul
 
         if (index_of) |word_index| {
             const line_copy = try allocator.dupe(u8, line);
-            const colorized = try colorizeWord(line_copy, search_for, color orelse Color.green, allocator);
-            try results.append(FoundItem{ .line_number = line_number, .line = colorized, .index = word_index });
+            try results.append(FoundItem{ .line_number = line_number, .line = line_copy, .index = word_index });
             index_of = null;
         }
     }
