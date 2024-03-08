@@ -8,7 +8,7 @@ const OutputOptions = @import("output.zig").OutputOptions;
 const writeOutput = @import("output.zig").writeOutput;
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{ .verbose_log = true }){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
     // Setup command line arguments
@@ -41,23 +41,28 @@ pub fn main() !void {
         // Pull out our positional arguments
         const search_for = parsed_args.positionals[0];
         const search_in = parsed_args.positionals[1];
+        var is_file = false;
 
         // In this case we most likely are dealing with a file or directory, just assume so for now
         if (std.fs.cwd().statFile(search_in)) |stat| {
             switch (stat.kind) {
                 .directory => std.debug.print("{s} is a directory\n", .{search_in}),
-                .file => try fileHandler.searchFile(search_in, search_for, &found),
+                .file => {
+                    is_file = true;
+                    try fileHandler.searchFile(search_in, search_for, &found, allocator);
+                },
                 else => std.debug.print("{s} is not a file or directory\n", .{search_in}),
             }
         } else |err| switch (err) {
             error.FileNotFound => try search(search_in, search_for, &found),
             else => std.debug.print("An error occured", .{}),
         }
-        try writeOutput(&found, search_for, OutputOptions{ .line_number = false, .file_path = null });
+        try writeOutput(&found, search_for, OutputOptions{ .line_number = false, .file_path = null, .is_file = is_file }, allocator);
     } else if (parsed_args.args.help != 0) {
         try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     } else {
         try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
+        // Could probably handle this better just by writing to stderr ourselves.
         try diag.report(std.io.getStdErr().writer(), error.NotEnoughArguments);
     }
 }

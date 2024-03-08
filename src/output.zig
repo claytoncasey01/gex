@@ -68,27 +68,32 @@ test "colorizeWord" {
 }
 
 // Options for how the output is handled.
-// TODO: Look into possibly handling the colorize here instead of in the search functions.
-pub const OutputOptions = struct { line_number: bool = false, file_path: ?[]const u8, delimiter: []const u8 = "\n", color: Color = Color.green };
+pub const OutputOptions = struct { line_number: bool = false, file_path: ?[]const u8, is_file: bool, delimiter: []const u8 = "\n", color: Color = Color.green };
 
 // TODO: Currently this only writes the output to the console in the same way
 // as we were. This needs to handle various arguments for writting in different ways
 // for example, normal strings or structured data.
-pub fn writeOutput(found_items: *ArrayList(FoundItem), search_for: []const u8, options: OutputOptions) !void {
-    const allocator = found_items.allocator;
+pub fn writeOutput(found_items: *ArrayList(FoundItem), search_for: []const u8, options: OutputOptions, allocator: std.mem.Allocator) !void {
     const out = std.io.getStdOut();
     var buf = std.io.bufferedWriter(out.writer());
     var w = buf.writer();
 
     if (options.line_number) {
         for (found_items.items) |item| {
-            try w.print("{d} {s}{s}", .{ item.line_number, try colorizeWord(item.line, search_for, options.color, allocator), options.delimiter });
+            const colorizedWord = try colorizeWord(item.line, search_for, options.color, allocator);
+            try w.print("{d} {s}{s}", .{ item.line_number, colorizedWord, options.delimiter });
             try buf.flush();
+            allocator.free(colorizedWord); // Colorize allocates memeory for the new string so we need to free it.
+            if (options.is_file) allocator.free(item.line); // If we are reading from a file we need to free the line since we allocate it.
         }
     } else {
         for (found_items.items) |item| {
-            try w.print("{s}{s}", .{ try colorizeWord(item.line, search_for, options.color, allocator), options.delimiter });
+            const colorizedWord = try colorizeWord(item.line, search_for, options.color, allocator);
+            try w.print("{s}{s}", .{ colorizedWord, options.delimiter });
             try buf.flush();
+            allocator.free(colorizedWord); // Colorize allocates memeory for the new string so we need to free it.
+            if (options.is_file) allocator.free(item.line); // If we are reading from a file we need to free the line since we allocate it.
+
         }
     }
 }

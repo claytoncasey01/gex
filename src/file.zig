@@ -6,8 +6,7 @@ const colorizeWord = @import("output.zig").colorizeWord;
 const Color = @import("output.zig").Color;
 
 // TODO: We will want to make the color configurable here.
-pub fn searchFile(path: []const u8, search_for: []const u8, results: *std.ArrayList(FoundItem)) !void {
-    const allocator = results.allocator;
+pub fn searchFile(path: []const u8, search_for: []const u8, results: *std.ArrayList(FoundItem), allocator: std.mem.Allocator) !void {
     var file = try fs.cwd().openFile(path, .{});
     defer file.close();
 
