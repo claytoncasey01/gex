@@ -12,7 +12,7 @@ pub fn searchFile(path: []const u8, search_for: []const u8, results: *std.ArrayL
 
     var buf_reader = io.bufferedReader(file.reader());
     var in_stream = buf_reader.reader();
-    var buf: [2048]u8 = undefined;
+    var buf: [4096]u8 = undefined;
     var index_of: ?usize = null;
     var line_number: u32 = 1;
 
