@@ -19,7 +19,7 @@ pub fn main() !void {
         \\-i, --ignore-case Ignore case distinctions in both the PATTERN and the input files.
         \\-v, --invert-match Invert the sense of matching, to select non-matching lines.
         \\-w, --word-regexp Select only those lines containing matches that form whole words.
-        \\-c, --color <str>... Select which color to be used when displaying the match. Defaults to green. 
+        \\-c, --color <str>... Select which color to be used when displaying the match. Defaults to green.
         \\<str> The text to search for
         \\<str> The file or text to search in
     );
@@ -42,6 +42,7 @@ pub fn main() !void {
         const search_for = parsed_args.positionals[0];
         const search_in = parsed_args.positionals[1];
         var is_file = false;
+        var color: Color = Color.green;
 
         // In this case we most likely are dealing with a file or directory, just assume so for now
         if (std.fs.cwd().statFile(search_in)) |stat| {
@@ -57,7 +58,13 @@ pub fn main() !void {
             error.FileNotFound => try search(search_in, search_for, &found),
             else => std.debug.print("An error occured", .{}),
         }
-        try writeOutput(&found, search_for, OutputOptions{ .line_number = false, .file_path = null, .is_file = is_file }, allocator);
+
+        // A color was passed, so pull it out
+        if (parsed_args.args.color.len > 0) {
+            // If an invalid color is passed, just default to green
+            color = std.meta.stringToEnum(Color, parsed_args.args.color[0]) orelse Color.green;
+        }
+        try writeOutput(&found, search_for, OutputOptions{ .line_number = false, .file_path = null, .is_file = is_file, .color = color }, allocator);
     } else if (parsed_args.args.help != 0) {
         try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     } else {

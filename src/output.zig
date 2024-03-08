@@ -4,14 +4,75 @@ const FoundItem = @import("types.zig").FoundItem;
 
 pub const Color = enum(u8) {
     reset,
+    black,
     red,
     green,
+    yellow,
+    blue,
+    magenta,
+    cyan,
+    white,
+    blackBright,
+    redBright,
+    greenBright,
+    yellowBright,
+    blueBright,
+    magentaBright,
+    cyanBright,
+    whiteBright,
+    // Background Colors
+    bgBlack,
+    bgRed,
+    bgGreen,
+    bgYellow,
+    bgBlue,
+    bgMagenta,
+    bgCyan,
+    bgWhite,
+    bgBlackBright,
+    bgRedBright,
+    bgGreenBright,
+    bgYellowBright,
+    bgBlueBright,
+    bgMagentaBright,
+    bgCyanBright,
+    bgWhiteBright,
 
     pub fn getCode(self: Color) []const u8 {
         return switch (self) {
             .reset => "\x1b[0m",
+            .black => "\x1b[30m",
             .red => "\x1b[31m",
             .green => "\x1b[32m",
+            .yellow => "\x1b[33m",
+            .blue => "\x1b[34m",
+            .magenta => "\x1b[35m",
+            .cyan => "\x1b[36m",
+            .white => "\x1b[37m",
+            .blackBright => "\x1b[90m",
+            .redBright => "\x1b[91m",
+            .greenBright => "\x1b[92m",
+            .yellowBright => "\x1b[93m",
+            .blueBright => "\x1b[94m",
+            .magentaBright => "\x1b[95m",
+            .cyanBright => "\x1b[96m",
+            .whiteBright => "\x1b[97m",
+            .bgBlack => "\x1b[40m",
+            .bgRed => "\x1b[41m",
+            .bgGreen => "\x1b[42m",
+            .bgYellow => "\x1b[43m",
+            .bgBlue => "\x1b[44m",
+            .bgMagenta => "\x1b[45m",
+            .bgCyan => "\x1b[46m",
+            .bgWhite => "\x1b[47m",
+            .bgBlackBright => "\x1b[100m",
+            .bgRedBright => "\x1b[101m",
+            .bgGreenBright => "\x1b[102m",
+            .bgYellowBright => "\x1b[103m",
+            .bgBlueBright => "\x1b[104m",
+            .bgMagentaBright => "\x1b[105m",
+            .bgCyanBright => "\x1b[106m",
+            .bgWhiteBright => "\x1b[107m",
         };
     }
 };
@@ -68,7 +129,7 @@ test "colorizeWord" {
 }
 
 // Options for how the output is handled.
-pub const OutputOptions = struct { line_number: bool = false, file_path: ?[]const u8, is_file: bool, delimiter: []const u8 = "\n", color: Color = Color.green };
+pub const OutputOptions = struct { line_number: bool = false, file_path: ?[]const u8, is_file: bool, delimiter: []const u8 = "\n", color: Color };
 
 // TODO: Currently this only writes the output to the console in the same way
 // as we were. This needs to handle various arguments for writting in different ways
