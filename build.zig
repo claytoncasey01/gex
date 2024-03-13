@@ -16,13 +16,22 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const exe = b.addExecutable(.{
-        .name = "zrep",
+        .name = "gex",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
+
+    // Add regex_slim and link libc
+    // const lib = b.addStaticLibrary(.{ .name = "regex_tiny", .optimize = optimize, .target = target });
+    // lib.addIncludePath(.{ .path = "lib" });
+    // lib.addCSourceFile(.{ .files = &.{"lib/regex/regex_tiny.c"}, .flags = &.{"-std=c99"} });
+    // lib.linkLibC();
+    // exe.linkLibrary(lib);
+    // exe.addIncludePath(.{ .path = "lib" });
+    // exe.linkLibC();
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default

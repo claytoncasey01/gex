@@ -37,19 +37,26 @@ pub fn main() !void {
     var found = std.ArrayList(FoundItem).init(allocator);
     defer found.deinit();
 
+    var color: Color = Color.green;
+
+    // A color was passed, so pull it out
+    if (parsed_args.args.color.len > 0) {
+        // If an invalid color is passed, just default to green
+        color = std.meta.stringToEnum(Color, parsed_args.args.color[0]) orelse Color.green;
+    }
+
     if (parsed_args.positionals.len == 2) {
         // Pull out our positional arguments
         const search_for = parsed_args.positionals[0];
-        const search_in = parsed_args.positionals[1];
-        var is_file = false;
-        var color: Color = Color.green;
+        const search_in = parsed_args.positionals[0];
+        var needs_free = false;
 
         // In this case we most likely are dealing with a file or directory, just assume so for now
         if (std.fs.cwd().statFile(search_in)) |stat| {
             switch (stat.kind) {
                 .directory => std.debug.print("{s} is a directory\n", .{search_in}),
                 .file => {
-                    is_file = true;
+                    needs_free = true;
                     try fileHandler.searchFile(search_in, search_for, &found, allocator);
                 },
                 else => std.debug.print("{s} is not a file or directory\n", .{search_in}),
@@ -59,12 +66,29 @@ pub fn main() !void {
             else => std.debug.print("An error occured", .{}),
         }
 
-        // A color was passed, so pull it out
-        if (parsed_args.args.color.len > 0) {
-            // If an invalid color is passed, just default to green
-            color = std.meta.stringToEnum(Color, parsed_args.args.color[0]) orelse Color.green;
+        try writeOutput(&found, search_for, OutputOptions{ .line_number = false, .file_path = null, .needs_free = needs_free, .color = color }, allocator);
+    } else if (parsed_args.positionals.len == 1) { // Assume we are getting piped input
+        const search_for = parsed_args.positionals[0];
+        // This is esentially the same as searchFile, but we are reading from stdin
+        // could probably be refactored to both use the same function.
+        const in = std.io.getStdIn().reader();
+        var buf = std.io.bufferedReader(in);
+        var r = buf.reader();
+        var piped_buf: [4096]u8 = undefined;
+        var index_of: ?usize = null;
+        var line_number: usize = 1;
+
+        while (try r.readUntilDelimiterOrEof(&piped_buf, '\n')) |line| : (line_number += 1) {
+            index_of = std.mem.indexOf(u8, line, search_for) orelse continue;
+
+            if (index_of) |word_index| {
+                const line_copy = try allocator.dupe(u8, line);
+                try found.append(FoundItem{ .line_number = line_number, .line = line_copy, .index = word_index });
+                index_of = null;
+            }
         }
-        try writeOutput(&found, search_for, OutputOptions{ .line_number = false, .file_path = null, .is_file = is_file, .color = color }, allocator);
+
+        try writeOutput(&found, search_for, OutputOptions{ .line_number = false, .file_path = null, .needs_free = true, .color = color }, allocator);
     } else if (parsed_args.args.help != 0) {
         try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     } else {

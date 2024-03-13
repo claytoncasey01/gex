@@ -129,7 +129,7 @@ test "colorizeWord" {
 }
 
 // Options for how the output is handled.
-pub const OutputOptions = struct { line_number: bool = false, file_path: ?[]const u8, is_file: bool, delimiter: []const u8 = "\n", color: Color };
+pub const OutputOptions = struct { line_number: bool = false, file_path: ?[]const u8, needs_free: bool, delimiter: []const u8 = "\n", color: Color };
 
 // TODO: Currently this only writes the output to the console in the same way
 // as we were. This needs to handle various arguments for writting in different ways
@@ -145,7 +145,7 @@ pub fn writeOutput(found_items: *ArrayList(FoundItem), search_for: []const u8, o
             try w.print("{d} {s}{s}", .{ item.line_number, colorizedWord, options.delimiter });
             try buf.flush();
             allocator.free(colorizedWord); // Colorize allocates memeory for the new string so we need to free it.
-            if (options.is_file) allocator.free(item.line); // If we are reading from a file we need to free the line since we allocate it.
+            if (options.needs_free) allocator.free(item.line); // If we are reading from a file we need to free the line since we allocate it.
         }
     } else {
         for (found_items.items) |item| {
@@ -153,7 +153,7 @@ pub fn writeOutput(found_items: *ArrayList(FoundItem), search_for: []const u8, o
             try w.print("{s}{s}", .{ colorizedWord, options.delimiter });
             try buf.flush();
             allocator.free(colorizedWord); // Colorize allocates memeory for the new string so we need to free it.
-            if (options.is_file) allocator.free(item.line); // If we are reading from a file we need to free the line since we allocate it.
+            if (options.needs_free) allocator.free(item.line); // If we are reading from a file we need to free the line since we allocate it.
 
         }
     }
