@@ -24,6 +24,19 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // Link up c libs
+    const lib = b.addStaticLibrary(.{
+        .name = "regex_tiny",
+        .target = target,
+        .optimize = optimize,
+    });
+    lib.addIncludePath(.{ .path = "lib" });
+    lib.addCSourceFiles(.{ .files = &[_][]const u8{"lib/regex/regex_tiny.c"}, .flags = &[_][]const u8{"-std=c99"} });
+    lib.linkLibC();
+    exe.linkLibrary(lib);
+    exe.addIncludePath(.{ .path = "lib" });
+    exe.linkLibC();
+
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
