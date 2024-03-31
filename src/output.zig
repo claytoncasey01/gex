@@ -123,7 +123,7 @@ test "colorizeWord" {
     const allocator = std.testing.allocator;
     const str = "Hello, world!";
     const word = "world";
-    const colorized = try colorizeWord(str, Color.green, word, allocator);
+    const colorized = try colorizeWord(str, word, Color.green, allocator);
     defer allocator.free(colorized);
     try std.testing.expectEqualStrings("Hello, \x1b[32mworld\x1b[0m!", colorized);
 }
