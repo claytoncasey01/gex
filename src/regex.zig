@@ -1,4 +1,5 @@
 const std = @import("std");
+const toCString = @import("util.zig").toCString;
 const c = @cImport({
     @cInclude("regex.h");
     @cInclude("regex_tiny.h");
@@ -12,22 +13,25 @@ pub const Match = struct {
 
 pub const Regex = struct {
     inner: *c.regex_t,
+    allocator: std.mem.Allocator,
 
-    fn compile(pattern: [:0]const u8) !Regex {
+    pub fn compile(pattern: []const u8, allocator: std.mem.Allocator) !Regex {
         const inner = c.alloc_regex_t().?;
-        if (c.regcomp(inner, pattern, c.REG_NEWLINE | c.REG_EXTENDED) != 0) {
+        const c_pattern = try toCString(pattern, allocator);
+        // defer allocator.free(c_pattern);
+
+        if (c.regcomp(inner, c_pattern, c.REG_NEWLINE | c.REG_EXTENDED) != 0) {
             return error.compile;
         }
 
-        return .{
-            .inner = inner,
-        };
+        return .{ .inner = inner, .allocator = allocator };
     }
 
-    fn deinit(self: Regex) void {
+    pub fn deinit(self: Regex) void {
         c.free_regex_t(self.inner);
     }
 
+    // TODO: Fix this, should take []const u8 and convert to CString
     fn is_match(self: Regex, input: [:0]const u8) bool {
         const match_size = 1;
         var pmatch: [match_size]c.regmatch_t = undefined;
@@ -35,19 +39,27 @@ pub const Regex = struct {
         return c.regexec(self.inner, input, match_size, &pmatch, 0) == 0;
     }
 
-    fn exec(self: Regex, input: [:0]const u8, matches: *std.ArrayList(Match)) !void {
+    pub fn exec(self: Regex, input: []const u8, matches: *std.ArrayList(Match)) !void {
         const match_size = 1;
         var pmatch: [match_size]c.regmatch_t = undefined;
 
-        var string = input;
+        const c_string = try toCString(input, self.allocator);
+        defer self.allocator.free(c_string);
 
-        while (true) {
+        var string = c_string;
+
+        while (string.len > 0) {
             if (0 != c.regexec(self.inner, string, match_size, &pmatch, 0)) {
                 break;
             }
 
             const start = @as(usize, @intCast(pmatch[0].rm_so));
             const end = @as(usize, @intCast(pmatch[0].rm_eo));
+
+            if (end > string.len) {
+                break;
+            }
+
             const slice = string[start..end];
 
             try matches.append(Match{
