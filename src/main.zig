@@ -48,44 +48,44 @@ pub fn main() !void {
 
     if (parsed_args.positionals.len == 2) {
         // Pull out our positional arguments
-        const search_for = parsed_args.positionals[0];
-        const search_in = parsed_args.positionals[1];
+        const needle = parsed_args.positionals[0];
+        const haystack = parsed_args.positionals[1];
         var needs_free = false;
 
         // In this case we most likely are dealing with a file or directory, just assume so for now
-        if (std.fs.cwd().statFile(search_in)) |stat| {
+        if (std.fs.cwd().statFile(haystack)) |stat| {
             switch (stat.kind) {
-                .directory => std.debug.print("{s} is a directory\n", .{search_in}),
+                .directory => std.debug.print("{s} is a directory\n", .{haystack}),
                 .file => {
                     needs_free = true;
                     // Get the handle for the file to be searched
-                    const file = try std.fs.cwd().openFile(search_in, .{ .mode = .read_only });
+                    const file = try std.fs.cwd().openFile(haystack, .{ .mode = .read_only });
                     defer file.close();
 
-                    const options = SearchOptions{ .input_file = &file, .needle = search_for, .results = &found, .allocator = allocator };
+                    const options = SearchOptions{ .input_file = &file, .needle = needle, .results = &found, .allocator = allocator };
                     try search(options);
                 },
-                else => std.debug.print("{s} is not a file or directory\n", .{search_in}),
+                else => std.debug.print("{s} is not a file or directory\n", .{haystack}),
             }
         } else |err| switch (err) {
             error.FileNotFound => {
-                const options = SearchOptions{ .haystack = search_in, .needle = search_for, .results = &found, .allocator = allocator };
+                const options = SearchOptions{ .haystack = haystack, .needle = needle, .results = &found, .allocator = allocator };
                 try search(options);
             },
             else => std.debug.print("An error occured", .{}),
         }
 
-        try writeOutput(&found, search_for, OutputOptions{ .line_number = false, .file_path = null, .needs_free = needs_free, .color = color }, allocator);
+        try writeOutput(&found, needle, OutputOptions{ .line_number = false, .file_path = null, .needs_free = needs_free, .color = color }, allocator);
     } else if (parsed_args.positionals.len == 1) { // Assume we are getting piped input
-        const search_for = parsed_args.positionals[0];
+        const needle = parsed_args.positionals[0];
         // This is esentially the same as searchFile, but we are reading from stdin
         // could probably be refactored to both use the same function.
         const stdin = std.io.getStdIn();
-        const options = SearchOptions{ .input_file = &stdin, .needle = search_for, .results = &found, .allocator = allocator };
+        const options = SearchOptions{ .input_file = &stdin, .needle = needle, .results = &found, .allocator = allocator };
 
         try search(options);
 
-        try writeOutput(&found, search_for, OutputOptions{ .line_number = false, .file_path = null, .needs_free = true, .color = color }, allocator);
+        try writeOutput(&found, needle, OutputOptions{ .line_number = false, .file_path = null, .needs_free = true, .color = color }, allocator);
     } else if (parsed_args.args.help != 0) {
         try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     } else {

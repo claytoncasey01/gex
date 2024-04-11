@@ -134,14 +134,14 @@ pub const OutputOptions = struct { line_number: bool = false, file_path: ?[]cons
 // TODO: Currently this only writes the output to the console in the same way
 // as we were. This needs to handle various arguments for writting in different ways
 // for example, normal strings or structured data.
-pub fn writeOutput(found_items: *ArrayList(FoundItem), search_for: []const u8, options: OutputOptions, allocator: std.mem.Allocator) !void {
+pub fn writeOutput(found_items: *ArrayList(FoundItem), needle: []const u8, options: OutputOptions, allocator: std.mem.Allocator) !void {
     const out = std.io.getStdOut();
     var buf = std.io.bufferedWriter(out.writer());
     var w = buf.writer();
 
     if (options.line_number) {
         for (found_items.items) |item| {
-            const colorizedWord = try colorizeWord(item.line, search_for, options.color, allocator);
+            const colorizedWord = try colorizeWord(item.line, needle, options.color, allocator);
             try w.print("{d} {s}{s}", .{ item.line_number, colorizedWord, options.delimiter });
             try buf.flush();
             allocator.free(colorizedWord); // Colorize allocates memeory for the new string so we need to free it.
@@ -149,7 +149,7 @@ pub fn writeOutput(found_items: *ArrayList(FoundItem), search_for: []const u8, o
         }
     } else {
         for (found_items.items) |item| {
-            const colorizedWord = try colorizeWord(item.line, search_for, options.color, allocator);
+            const colorizedWord = try colorizeWord(item.line, needle, options.color, allocator);
             try w.print("{s}{s}", .{ colorizedWord, options.delimiter });
             try buf.flush();
             allocator.free(colorizedWord); // Colorize allocates memeory for the new string so we need to free it.
