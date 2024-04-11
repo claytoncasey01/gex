@@ -1,11 +1,12 @@
 const std = @import("std");
 const clap = @import("deps/zig-clap/clap.zig");
 const FoundItem = @import("types.zig").FoundItem;
-const fileHandler = @import("file.zig");
 const colorizeWord = @import("output.zig").colorizeWord;
 const Color = @import("output.zig").Color;
 const OutputOptions = @import("output.zig").OutputOptions;
 const writeOutput = @import("output.zig").writeOutput;
+const search = @import("input.zig").search;
+const SearchOptions = @import("input.zig").SearchOptions;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -48,7 +49,7 @@ pub fn main() !void {
     if (parsed_args.positionals.len == 2) {
         // Pull out our positional arguments
         const search_for = parsed_args.positionals[0];
-        const search_in = parsed_args.positionals[0];
+        const search_in = parsed_args.positionals[1];
         var needs_free = false;
 
         // In this case we most likely are dealing with a file or directory, just assume so for now
@@ -57,12 +58,20 @@ pub fn main() !void {
                 .directory => std.debug.print("{s} is a directory\n", .{search_in}),
                 .file => {
                     needs_free = true;
-                    try fileHandler.searchFile(search_in, search_for, &found, allocator);
+                    // Get the handle for the file to be searched
+                    const file = try std.fs.cwd().openFile(search_in, .{ .mode = .read_only });
+                    defer file.close();
+
+                    const options = SearchOptions{ .input_file = &file, .needle = search_for, .results = &found, .allocator = allocator };
+                    try search(options);
                 },
                 else => std.debug.print("{s} is not a file or directory\n", .{search_in}),
             }
         } else |err| switch (err) {
-            error.FileNotFound => try search(search_in, search_for, &found),
+            error.FileNotFound => {
+                const options = SearchOptions{ .haystack = search_in, .needle = search_for, .results = &found, .allocator = allocator };
+                try search(options);
+            },
             else => std.debug.print("An error occured", .{}),
         }
 
@@ -71,22 +80,10 @@ pub fn main() !void {
         const search_for = parsed_args.positionals[0];
         // This is esentially the same as searchFile, but we are reading from stdin
         // could probably be refactored to both use the same function.
-        const in = std.io.getStdIn().reader();
-        var buf = std.io.bufferedReader(in);
-        var r = buf.reader();
-        var piped_buf: [4096]u8 = undefined;
-        var index_of: ?usize = null;
-        var line_number: usize = 1;
+        const stdin = std.io.getStdIn();
+        const options = SearchOptions{ .input_file = &stdin, .needle = search_for, .results = &found, .allocator = allocator };
 
-        while (try r.readUntilDelimiterOrEof(&piped_buf, '\n')) |line| : (line_number += 1) {
-            index_of = std.mem.indexOf(u8, line, search_for) orelse continue;
-
-            if (index_of) |word_index| {
-                const line_copy = try allocator.dupe(u8, line);
-                try found.append(FoundItem{ .line_number = line_number, .line = line_copy, .index = word_index });
-                index_of = null;
-            }
-        }
+        try search(options);
 
         try writeOutput(&found, search_for, OutputOptions{ .line_number = false, .file_path = null, .needs_free = true, .color = color }, allocator);
     } else if (parsed_args.args.help != 0) {
@@ -95,25 +92,6 @@ pub fn main() !void {
         try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
         // Could probably handle this better just by writing to stderr ourselves.
         try diag.report(std.io.getStdErr().writer(), error.NotEnoughArguments);
-    }
-}
-
-// Takes a string to be searched and a string to search for. It will return
-// a modified version of the to_seach with all the instances of search_for highlighted
-// NOTE: It might be useful to update this to also return some statistics about the search,
-// like the number of matches, the indexes of the matches, etc.
-fn search(to_search: []const u8, search_for: []const u8, found: *std.ArrayList(FoundItem)) !void {
-    var to_search_lines = std.mem.splitSequence(u8, to_search, "\n");
-    var cursor: usize = 1;
-    var index_of: usize = undefined;
-
-    while (to_search_lines.next()) |line| {
-        index_of = std.mem.indexOf(u8, line, search_for) orelse continue;
-
-        if (index_of > 0) {
-            try found.append(FoundItem{ .line_number = cursor, .line = line, .index = index_of });
-            cursor += 1;
-        }
     }
 }
 
