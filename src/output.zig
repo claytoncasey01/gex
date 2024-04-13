@@ -78,6 +78,8 @@ pub const Color = enum(u8) {
 };
 
 // NOTE: This works but it may not be the most efficient way to do this.
+// with regex we have the start and end index of a match, so we shouldn't need
+// to do a search here anymore.
 pub fn colorizeWord(str: []const u8, word: []const u8, color: Color, allocator: std.mem.Allocator) ![]const u8 {
     const color_code = color.getCode();
     const reset_code = Color.reset.getCode();

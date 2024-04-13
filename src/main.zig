@@ -7,6 +7,9 @@ const OutputOptions = @import("output.zig").OutputOptions;
 const writeOutput = @import("output.zig").writeOutput;
 const search = @import("input.zig").search;
 const SearchOptions = @import("input.zig").SearchOptions;
+const Regex = @import("regex.zig").Regex;
+const Match = @import("regex.zig").Match;
+const testPrintMatches = @import("regex.zig").testPrintMatches;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -21,6 +24,7 @@ pub fn main() !void {
         \\-v, --invert-match Invert the sense of matching, to select non-matching lines.
         \\-w, --word-regexp Select only those lines containing matches that form whole words.
         \\-c, --color <str>... Select which color to be used when displaying the match. Defaults to green.
+        \\-R, --regex Test the regex, print the matches, and exit.
         \\<str> The text to search for
         \\<str> The file or text to search in
     );
@@ -62,6 +66,28 @@ pub fn main() !void {
                     const file = try std.fs.cwd().openFile(haystack, .{ .mode = .read_only });
                     defer file.close();
 
+                    if (parsed_args.args.regex != 0) {
+                        const regex = Regex.compile(needle, allocator) catch {
+                            std.debug.print("Failed to compile pattern: {s}\n", .{needle});
+                            return;
+                        };
+                        defer regex.deinit();
+
+                        var matches = std.ArrayList(Match).init(allocator);
+                        defer matches.deinit();
+
+                        const file_contents = try file.readToEndAlloc(allocator, @as(usize, stat.size));
+                        defer allocator.free(file_contents);
+
+                        regex.exec(file_contents, &matches) catch |err| {
+                            std.debug.print("An error occured: {}\n", .{err});
+                            return;
+                        };
+                        testPrintMatches(&matches);
+
+                        return;
+                    }
+
                     const options = SearchOptions{ .input_file = &file, .needle = needle, .results = &found, .allocator = allocator };
                     try search(options);
                 },
@@ -75,7 +101,7 @@ pub fn main() !void {
             else => std.debug.print("An error occured", .{}),
         }
 
-        try writeOutput(&found, needle, OutputOptions{ .line_number = false, .file_path = null, .needs_free = needs_free, .color = color }, allocator);
+        try writeOutput(&found, needle, OutputOptions{ .line_number = true, .file_path = null, .needs_free = needs_free, .color = color }, allocator);
     } else if (parsed_args.positionals.len == 1) { // Assume we are getting piped input
         const needle = parsed_args.positionals[0];
         // This is esentially the same as searchFile, but we are reading from stdin
