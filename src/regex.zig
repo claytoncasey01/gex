@@ -8,7 +8,7 @@ const c = @cImport({
     @cInclude("regex_tiny.h");
 });
 
-const WordPosition = struct {
+pub const WordPosition = struct {
     start: usize,
     end: usize,
 };
@@ -19,15 +19,15 @@ pub const Match = struct {
     allocator: Allocator,
     slice: []const u8,
     line_number: usize,
-    indexes: std.ArrayList(WordPosition),
+    position: WordPosition,
 
-    pub fn init(slice: []const u8, line_number: usize, allocator: Allocator) Self {
-        return Self{ .slice = slice, .line_number = line_number, .indexes = std.ArrayList(WordPosition).init(allocator), .allocator = allocator };
+    pub fn init(slice: []const u8, line_number: usize, position: WordPosition, allocator: Allocator) !Self {
+        const slice_copy = try allocator.dupe(u8, slice);
+        return Self{ .slice = slice_copy, .line_number = line_number, .position = position, .allocator = allocator };
     }
 
     pub fn deinit(self: Self) void {
         self.allocator.free(self.slice);
-        self.indexes.deinit();
     }
 };
 
@@ -61,33 +61,17 @@ pub const Regex = struct {
         return c.regexec(self.inner, input, match_size, &pmatch, 0) == 0;
     }
 
-    pub fn exec(self: Self, input: []const u8, matches: *std.ArrayList(Match)) !void {
+    pub fn exec(self: Self, input: []const u8) !WordPosition {
         const match_size = 1;
         var pmatch: [match_size]c.regmatch_t = undefined;
 
         const c_string = try toCString(input, self.allocator);
         defer self.allocator.free(c_string);
 
-        // Preprocess the input string to store the line bounderies
-        var line_starts = std.ArrayList(usize).init(self.allocator);
-        defer line_starts.deinit();
-
-        var start_line: usize = 0;
-        while (start_line < input.len) {
-            try line_starts.append(start_line);
-            const line_end = std.mem.indexOfScalarPos(u8, input, start_line, '\n');
-            start_line = if (line_end) |end| end + 1 else input.len;
-        }
-
-        var string = c_string;
-        var line_index: usize = 0;
-
-        // Map to store the indexes of each Match struct by line number
-        var match_map = std.AutoHashMap(usize, usize).init(self.allocator);
-        defer match_map.deinit();
+        const string = input;
 
         while (string.len > 0) {
-            if (0 != c.regexec(self.inner, string, match_size, &pmatch, 0)) {
+            if (0 != c.regexec(self.inner, c_string, match_size, &pmatch, 0)) {
                 break;
             }
 
@@ -98,31 +82,12 @@ pub const Regex = struct {
                 break;
             }
 
-            // Find the line number and line slice for the match
-            while (line_index + 1 < line_starts.items.len and line_starts.items[line_index + 1] < start) {
-                line_index += 1;
-            }
+            return WordPosition{ .start = start, .end = end };
 
-            const line_number = line_index + 1;
-            const line_start = line_starts.items[line_index];
-            const line_end = if (line_index + 1 < line_starts.items.len) line_starts.items[line_index + 1] - 1 else input.len;
-
-            const line_slice = input[line_start..line_end];
-
-            if (match_map.get(line_number)) |index| {
-                try matches.items[index].indexes.append(.{ .start = start, .end = end });
-            } else {
-                const line_copy = try self.allocator.dupe(u8, line_slice);
-                var match = Match.init(line_copy, line_number, self.allocator);
-                try match.indexes.append(.{ .start = start, .end = end });
-                try matches.append(match);
-
-                // store the index of the new Match struct in the map
-                try match_map.put(line_number, matches.items.len - 1);
-            }
-
-            string = string[end..];
+            // string = string[end..];
         }
+
+        return WordPosition{ .start = 0, .end = 0 };
     }
 };
 
