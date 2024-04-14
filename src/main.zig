@@ -7,6 +7,12 @@ const OutputOptions = @import("output.zig").OutputOptions;
 const writeOutput = @import("output.zig").writeOutput;
 const search = @import("input.zig").search;
 const SearchOptions = @import("input.zig").SearchOptions;
+const Regex = @import("regex.zig").Regex;
+const Match = @import("regex.zig").Match;
+const WordPosition = @import("regex.zig").WordPosition;
+const testPrintMatches = @import("regex.zig").testPrintMatches;
+const io = std.io;
+const toCString = @import("util.zig").toCString;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -21,6 +27,7 @@ pub fn main() !void {
         \\-v, --invert-match Invert the sense of matching, to select non-matching lines.
         \\-w, --word-regexp Select only those lines containing matches that form whole words.
         \\-c, --color <str>... Select which color to be used when displaying the match. Defaults to green.
+        \\-R, --regex Test the regex, print the matches, and exit.
         \\<str> The text to search for
         \\<str> The file or text to search in
     );
@@ -38,7 +45,11 @@ pub fn main() !void {
     var found = std.ArrayList(FoundItem).init(allocator);
     defer found.deinit();
 
+    var matches = std.ArrayList(Match).init(allocator);
+    defer matches.deinit();
+
     var color: Color = Color.green;
+    const use_regex = parsed_args.args.regex != 0;
 
     // A color was passed, so pull it out
     if (parsed_args.args.color.len > 0) {
@@ -62,30 +73,31 @@ pub fn main() !void {
                     const file = try std.fs.cwd().openFile(haystack, .{ .mode = .read_only });
                     defer file.close();
 
-                    const options = SearchOptions{ .input_file = &file, .needle = needle, .results = &found, .allocator = allocator };
+                    const options = SearchOptions{ .input_file = &file, .needle = needle, .results = &found, .regex_path = use_regex, .matches = &matches, .allocator = allocator };
                     try search(options);
                 },
                 else => std.debug.print("{s} is not a file or directory\n", .{haystack}),
             }
         } else |err| switch (err) {
             error.FileNotFound => {
-                const options = SearchOptions{ .haystack = haystack, .needle = needle, .results = &found, .allocator = allocator };
+                const options = SearchOptions{ .matches = &matches, .regex_path = use_regex, .haystack = haystack, .needle = needle, .results = &found, .allocator = allocator };
                 try search(options);
             },
             else => std.debug.print("An error occured", .{}),
         }
 
-        try writeOutput(&found, needle, OutputOptions{ .line_number = false, .file_path = null, .needs_free = needs_free, .color = color }, allocator);
+        // TODO: This is a bit of a hack, but it works for now
+        try writeOutput(&found, needle, OutputOptions{ .matches = &matches, .regex_path = use_regex, .line_number = true, .file_path = null, .needs_free = needs_free, .color = color }, allocator);
     } else if (parsed_args.positionals.len == 1) { // Assume we are getting piped input
         const needle = parsed_args.positionals[0];
         // This is esentially the same as searchFile, but we are reading from stdin
         // could probably be refactored to both use the same function.
         const stdin = std.io.getStdIn();
-        const options = SearchOptions{ .input_file = &stdin, .needle = needle, .results = &found, .allocator = allocator };
+        const options = SearchOptions{ .matches = &matches, .regex_path = use_regex, .input_file = &stdin, .needle = needle, .results = &found, .allocator = allocator };
 
         try search(options);
 
-        try writeOutput(&found, needle, OutputOptions{ .line_number = false, .file_path = null, .needs_free = true, .color = color }, allocator);
+        try writeOutput(&found, needle, OutputOptions{ .matches = &matches, .regex_path = use_regex, .line_number = false, .file_path = null, .needs_free = true, .color = color }, allocator);
     } else if (parsed_args.args.help != 0) {
         try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     } else {
