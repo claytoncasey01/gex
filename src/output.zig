@@ -1,6 +1,7 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
 const FoundItem = @import("types.zig").FoundItem;
+const Match = @import("regex.zig").Match;
 
 pub const Color = enum(u8) {
     reset,
@@ -131,7 +132,7 @@ test "colorizeWord" {
 }
 
 // Options for how the output is handled.
-pub const OutputOptions = struct { line_number: bool = false, file_path: ?[]const u8, needs_free: bool, delimiter: []const u8 = "\n", color: Color };
+pub const OutputOptions = struct { matches: *ArrayList(Match), regex_path: bool = false, line_number: bool = false, file_path: ?[]const u8, needs_free: bool, delimiter: []const u8 = "\n", color: Color };
 
 // TODO: Currently this only writes the output to the console in the same way
 // as we were. This needs to handle various arguments for writting in different ways
@@ -141,22 +142,33 @@ pub fn writeOutput(found_items: *ArrayList(FoundItem), needle: []const u8, optio
     var buf = std.io.bufferedWriter(out.writer());
     var w = buf.writer();
 
-    if (options.line_number) {
-        for (found_items.items) |item| {
-            const colorizedWord = try colorizeWord(item.line, needle, options.color, allocator);
-            try w.print("{d} {s}{s}", .{ item.line_number, colorizedWord, options.delimiter });
+    // Handle the regex path seperatly for now
+    if (options.regex_path) {
+        for (options.matches.items) |match| {
+            defer match.deinit();
+            const colorizedWord = try colorizeWord(match.slice, needle, options.color, allocator);
+            try w.print("{d} {s}{s}", .{ match.line_number, colorizedWord, options.delimiter });
             try buf.flush();
             allocator.free(colorizedWord); // Colorize allocates memeory for the new string so we need to free it.
-            if (options.needs_free) allocator.free(item.line); // If we are reading from a file we need to free the line since we allocate it.
         }
     } else {
-        for (found_items.items) |item| {
-            const colorizedWord = try colorizeWord(item.line, needle, options.color, allocator);
-            try w.print("{s}{s}", .{ colorizedWord, options.delimiter });
-            try buf.flush();
-            allocator.free(colorizedWord); // Colorize allocates memeory for the new string so we need to free it.
-            if (options.needs_free) allocator.free(item.line); // If we are reading from a file we need to free the line since we allocate it.
+        if (options.line_number) {
+            for (found_items.items) |item| {
+                const colorizedWord = try colorizeWord(item.line, needle, options.color, allocator);
+                try w.print("{d} {s}{s}", .{ item.line_number, colorizedWord, options.delimiter });
+                try buf.flush();
+                allocator.free(colorizedWord); // Colorize allocates memeory for the new string so we need to free it.
+                if (options.needs_free) allocator.free(item.line); // If we are reading from a file we need to free the line since we allocate it.
+            }
+        } else {
+            for (found_items.items) |item| {
+                const colorizedWord = try colorizeWord(item.line, needle, options.color, allocator);
+                try w.print("{s}{s}", .{ colorizedWord, options.delimiter });
+                try buf.flush();
+                allocator.free(colorizedWord); // Colorize allocates memeory for the new string so we need to free it.
+                if (options.needs_free) allocator.free(item.line); // If we are reading from a file we need to free the line since we allocate it.
 
+            }
         }
     }
 }

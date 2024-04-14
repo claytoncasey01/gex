@@ -21,6 +21,8 @@ pub const Match = struct {
     line_number: usize,
     position: WordPosition,
 
+    // TODO: We might be able to avoid the allocator here if the slice we pass in comes
+    // from the colorizeWord function, which is already allocated.
     pub fn init(slice: []const u8, line_number: usize, position: WordPosition, allocator: Allocator) !Self {
         const slice_copy = try allocator.dupe(u8, slice);
         return Self{ .slice = slice_copy, .line_number = line_number, .position = position, .allocator = allocator };
@@ -70,6 +72,8 @@ pub const Regex = struct {
 
         const string = input;
 
+        // TODO: Currently we are only returning a single match
+        // this needs to be updated to return all matches found.
         while (string.len > 0) {
             if (0 != c.regexec(self.inner, c_string, match_size, &pmatch, 0)) {
                 break;
