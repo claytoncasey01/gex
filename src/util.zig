@@ -16,6 +16,14 @@ fn benchmarkToCString(allocator: std.mem.Allocator) void {
     allocator.free(c_string);
 }
 
+test "toCString" {
+    const allocator = std.testing.allocator;
+    const input = "Hello, World!";
+    const c_string = try toCString(input, allocator);
+    defer allocator.free(c_string);
+    try std.testing.expectEqualStrings(input, c_string);
+}
+
 test "Benchmark toCString" {
     const allocator = std.testing.allocator;
     var bench = Benchmark.init(allocator, .{});
