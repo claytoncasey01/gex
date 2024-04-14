@@ -2,6 +2,7 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const FoundItem = @import("types.zig").FoundItem;
 const Match = @import("regex.zig").Match;
+const Benchmark = @import("deps/zBench/zbench.zig").Benchmark;
 
 pub const Color = enum(u8) {
     reset,
@@ -122,6 +123,16 @@ pub fn colorizeWord(str: []const u8, word: []const u8, color: Color, allocator: 
     return result_string;
 }
 
+fn benchMarkColorizeWord(allocator: std.mem.Allocator) void {
+    const str = "Hello, world!";
+    const word = "world";
+    const colorized = colorizeWord(str, word, Color.green, allocator) catch {
+        std.debug.print("Failed to colorize word\n", .{});
+        return;
+    };
+    defer allocator.free(colorized);
+}
+
 test "colorizeWord" {
     const allocator = std.testing.allocator;
     const str = "Hello, world!";
@@ -129,6 +140,13 @@ test "colorizeWord" {
     const colorized = try colorizeWord(str, word, Color.green, allocator);
     defer allocator.free(colorized);
     try std.testing.expectEqualStrings("Hello, \x1b[32mworld\x1b[0m!", colorized);
+}
+
+test "Benchmark Colorize Word" {
+    var bench = Benchmark.init(std.testing.allocator, .{});
+    defer bench.deinit();
+    try bench.add("Colorize Word", benchMarkColorizeWord, .{});
+    try bench.run(std.io.getStdOut().writer());
 }
 
 // Options for how the output is handled.
