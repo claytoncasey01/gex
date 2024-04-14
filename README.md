@@ -16,10 +16,15 @@
 To install `gex`, make sure you have Zig installed on your system. Then, follow these steps:
 
 1.  Clone the `gex` repository:
+
     `git clone https://github.com/claytoncasey01/gex.git`
+
 2.  Navigate to the `gex` directory:
+
     `cd gex`
-3.  Build the project:  
+
+3.  Build the project:
+
     `zig build`
 
 4.  (Optional) Add the `gex` executable to your system's PATH for easier access.
@@ -29,6 +34,7 @@ To install `gex`, make sure you have Zig installed on your system. Then, follow 
 ### Basic Usage
 
 To search for a specific pattern (needle) in a given text or file (haystack), use the following command:
+
 `gex [needle] [haystack]`
 
 The `haystack` can be either input text or a file path.
@@ -36,16 +42,19 @@ The `haystack` can be either input text or a file path.
 ### Regular Expression Support
 
 To enable regular expression searching (experimental), add the `-R` flag to the command:
+
 `gex [regex_pattern] [haystack] -R`
 
 ### Colorized Output
 
 To enable colorized output using ANSI color codes, add the `-c` flag to the command:
+
 `gex -c [needle] [haystack]`
 
 ### Piping Support
 
 `gex` supports piping, allowing you to search within the output of other commands. For example:
+
 `ls -l | gex zig`
 
 This command will search for the word "zig" within the output of the `ls -l` command.
