@@ -3,6 +3,8 @@ const io = std.io;
 const fs = std.fs;
 const FoundItem = @import("types.zig").FoundItem;
 const colorizeWord = @import("output.zig").colorizeWord;
+const colorizeWordNoAlloc = @import("output.zig").colorizeWordNoAlloc;
+const writeOutput = @import("output.zig").writeOutputNew;
 const Color = @import("output.zig").Color;
 const Match = @import("regex.zig").Match;
 const Regex = @import("regex.zig").Regex;
@@ -15,23 +17,28 @@ pub const SearchOptions = struct {
     results: *std.ArrayList(FoundItem),
     matches: ?*std.ArrayList(Match) = null,
     regex_path: bool = false,
+    comptime buf_size: usize = 4096,
     allocator: std.mem.Allocator,
 };
 
 // TODO: Return an error here if both haystack and input_file are null.
 pub fn search(options: SearchOptions) !void {
+    const handle = try options.allocator.alloc(u8, options.buf_size);
+    defer options.allocator.free(handle);
+
     if (options.input_file) |file| {
+        try searchFileOrStdIn(file, options.needle, options.buf_size, handle);
+        // TODO: Optimize and reimplement this code path
         // Handle the regex code path sepearately for now
-        if (options.regex_path) {
-            if (options.matches) |matches| {
-                std.debug.print("Searching file with regex\n", .{});
-                try searchFileOrStdInRegex(file, options.needle, matches, options.allocator);
-            } else {
-                unreachable;
-            }
-        } else {
-            try searchFileOrStdIn(file, options.needle, options.results, options.allocator);
-        }
+        // if (options.regex_path) {
+        //     if (options.matches) |matches| {
+        //         std.debug.print("Searching file with regex\n", .{});
+        //         try searchFileOrStdInRegex(file, options.needle, options.allocator);
+        //     } else {
+        //         unreachable;
+        //     }
+        // } else {
+        // }
     } else if (options.haystack) |haystack| {
         if (options.regex_path) {
             if (options.matches) |matches| {
@@ -41,28 +48,32 @@ pub fn search(options: SearchOptions) !void {
                 unreachable;
             }
         } else {
-            try searchText(haystack, options.needle, options.results);
+            try searchText(haystack, options.needle, handle);
         }
     }
 }
 
 // TODO: We will want to make the color configurable here.
-fn searchFileOrStdIn(input_file: *const std.fs.File, needle: []const u8, results: *std.ArrayList(FoundItem), allocator: std.mem.Allocator) !void {
+fn searchFileOrStdIn(input_file: *const std.fs.File, needle: []const u8, comptime buf_size: usize, handle: []u8) !void {
     var buf_reader = io.bufferedReader(input_file.reader());
     var in_stream = buf_reader.reader();
-    var buf: [4096]u8 = undefined;
+    var buf: [buf_size]u8 = undefined;
     var index_of: ?usize = null;
     var line_number: u32 = 1;
 
+    // Setup our buffered writer needed for writing the output
+    // NOTE: Various flags could eventually change out to be a file
+    const out = std.io.getStdOut();
+    var buf_writer = std.io.bufferedWriter(out.writer());
+    var writer = buf_writer.writer();
+
     while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| : (line_number += 1) {
         index_of = std.mem.indexOf(u8, line, needle) orelse continue;
-
-        if (index_of) |word_index| {
-            const line_copy = try allocator.dupe(u8, line);
-            try results.append(FoundItem{ .line_number = line_number, .line = line_copy, .index = word_index });
-            index_of = null;
-        }
+        try writeOutput(line, needle, &writer, handle);
     }
+
+    // Actually write the output to the terminal
+    try buf_writer.flush();
 }
 
 fn searchFileOrStdInRegex(input_file: *const std.fs.File, needle: []const u8, matches: *std.ArrayList(Match), allocator: std.mem.Allocator) !void {
@@ -87,19 +98,19 @@ fn searchFileOrStdInRegex(input_file: *const std.fs.File, needle: []const u8, ma
 // a modified version of the to_seach with all the instances of needle highlighted
 // NOTE: It might be useful to update this to also return some statistics about the search,
 // like the number of matches, the indexes of the matches, etc.
-fn searchText(haystack: []const u8, needle: []const u8, found: *std.ArrayList(FoundItem)) !void {
+fn searchText(haystack: []const u8, needle: []const u8, handle: []u8) !void {
     var haystack_lines = std.mem.splitSequence(u8, haystack, "\n");
-    var cursor: usize = 1;
+    var line_number: usize = 1;
     var index_of: usize = undefined;
+    const out = std.io.getStdOut();
+    var buf_writer = std.io.bufferedWriter(out.writer());
+    var writer = buf_writer.writer();
 
-    while (haystack_lines.next()) |line| {
+    while (haystack_lines.next()) |line| : (line_number += 1) {
         index_of = std.mem.indexOf(u8, line, needle) orelse continue;
-
-        if (index_of > 0) {
-            try found.append(FoundItem{ .line_number = cursor, .line = line, .index = index_of });
-            cursor += 1;
-        }
+        try writeOutput(line, needle, &writer, handle);
     }
+    try buf_writer.flush();
 }
 
 fn searchTextRegex(haystack: []const u8, needle: []const u8, matches: *std.ArrayList(Match), allocator: std.mem.Allocator) !void {
