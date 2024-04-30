@@ -124,7 +124,7 @@ pub fn colorizeWord(str: []const u8, word: []const u8, color: Color, allocator: 
     return result_string;
 }
 
-pub fn colorizeWordNoAlloc(str: []const u8, word: []const u8, color: Color, string_handle: []u8) ![]const u8 {
+pub fn colorizeWordNoAlloc(str: []const u8, word: []const u8, color: Color, buffer: []u8) ![]const u8 {
     const color_code = color.getCode();
     const reset_code = Color.reset.getCode();
     const extra_len_per_occurrence = color_code.len + reset_code.len;
@@ -155,23 +155,23 @@ pub fn colorizeWordNoAlloc(str: []const u8, word: []const u8, color: Color, stri
 
     while (i < str.len) {
         if (std.mem.startsWith(u8, current_str_ptr, word)) {
-            std.mem.copyForwards(u8, string_handle[result_index..][0..color_code.len], color_code);
+            std.mem.copyForwards(u8, buffer[result_index..][0..color_code.len], color_code);
             result_index += color_code.len;
-            std.mem.copyForwards(u8, string_handle[result_index..][0..word.len], word);
+            std.mem.copyForwards(u8, buffer[result_index..][0..word.len], word);
             result_index += word.len;
-            std.mem.copyForwards(u8, string_handle[result_index..][0..reset_code.len], reset_code);
+            std.mem.copyForwards(u8, buffer[result_index..][0..reset_code.len], reset_code);
             result_index += reset_code.len;
             i += word.len;
             current_str_ptr = str[i..];
         } else {
-            string_handle[result_index] = current_str_ptr[0];
+            buffer[result_index] = current_str_ptr[0];
             result_index += 1;
             i += 1;
             current_str_ptr = str[i..];
         }
     }
 
-    return string_handle[0..result_string_len];
+    return buffer[0..result_string_len];
 }
 
 fn benchMarkColorizeWord(allocator: std.mem.Allocator) void {
@@ -246,13 +246,13 @@ pub fn writeOutput(found_items: *ArrayList(FoundItem), needle: []const u8, optio
 // as we were. This needs to handle various arguments for writting in different ways
 // for example, normal strings or structured data.
 // We also should have a specific type for w but they way writers work makes this hard, figure it out.
-pub fn writeOutputNew(line: []const u8, needle: []const u8, w: anytype, string_handle: []u8) !void {
+pub fn writeOutputNew(line: []const u8, needle: []const u8, w: anytype, buffer: []u8) !void {
     // Handle the regex path seperatly for now
     if (false) {
-        const colorizedWord = try colorizeWordNoAlloc(line, needle, Color.green, string_handle);
+        const colorizedWord = try colorizeWordNoAlloc(line, needle, Color.green, buffer);
         try w.print("{d} {s}{s}", .{ 0, colorizedWord, "\n" });
     } else {
-        const colorizedWord = try colorizeWordNoAlloc(line, needle, Color.green, string_handle);
+        const colorizedWord = try colorizeWordNoAlloc(line, needle, Color.green, buffer);
         try w.print("{s}{s}", .{ colorizedWord, "\n" });
     }
 }

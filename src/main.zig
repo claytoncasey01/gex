@@ -15,10 +15,8 @@ const io = std.io;
 const toCString = @import("util.zig").toCString;
 
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
-    defer arena.deinit();
 
     // Setup command line arguments
     const params = comptime clap.parseParamsComptime(
@@ -35,7 +33,6 @@ pub fn main() !void {
     );
 
     const allocator = gpa.allocator();
-    const arena_allocator = arena.allocator();
 
     // Parse line arguments
     var diag = clap.Diagnostic{};
@@ -77,7 +74,7 @@ pub fn main() !void {
                     defer file.close();
 
                     // Allocate some memory for the strings
-                    const options = SearchOptions{ .input_file = &file, .needle = needle, .results = &found, .regex_path = use_regex, .matches = &matches, .allocator = arena_allocator };
+                    const options = SearchOptions{ .input_file = &file, .needle = needle, .results = &found, .regex_path = use_regex, .matches = &matches, .allocator = allocator };
                     try search(options);
                 },
                 else => std.debug.print("{s} is not a file or directory\n", .{haystack}),

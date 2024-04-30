@@ -23,13 +23,13 @@ pub const SearchOptions = struct {
 
 // TODO: Return an error here if both haystack and input_file are null.
 pub fn search(options: SearchOptions) !void {
-    const handle = try options.allocator.alloc(u8, options.buf_size);
-    defer options.allocator.free(handle);
+    const buffer = try options.allocator.alloc(u8, options.buf_size);
+    defer options.allocator.free(buffer);
 
     if (options.input_file) |file| {
-        try searchFileOrStdIn(file, options.needle, options.buf_size, handle);
+        try searchFileOrStdIn(file, options.needle, options.buf_size, buffer);
         // TODO: Optimize and reimplement this code path
-        // Handle the regex code path sepearately for now
+        // buffer the regex code path sepearately for now
         // if (options.regex_path) {
         //     if (options.matches) |matches| {
         //         std.debug.print("Searching file with regex\n", .{});
@@ -48,13 +48,13 @@ pub fn search(options: SearchOptions) !void {
                 unreachable;
             }
         } else {
-            try searchText(haystack, options.needle, handle);
+            try searchText(haystack, options.needle, buffer);
         }
     }
 }
 
 // TODO: We will want to make the color configurable here.
-fn searchFileOrStdIn(input_file: *const std.fs.File, needle: []const u8, comptime buf_size: usize, handle: []u8) !void {
+fn searchFileOrStdIn(input_file: *const std.fs.File, needle: []const u8, comptime buf_size: usize, buffer: []u8) !void {
     var buf_reader = io.bufferedReader(input_file.reader());
     var in_stream = buf_reader.reader();
     var buf: [buf_size]u8 = undefined;
@@ -69,7 +69,7 @@ fn searchFileOrStdIn(input_file: *const std.fs.File, needle: []const u8, comptim
 
     while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| : (line_number += 1) {
         index_of = std.mem.indexOf(u8, line, needle) orelse continue;
-        try writeOutput(line, needle, &writer, handle);
+        try writeOutput(line, needle, &writer, buffer);
     }
 
     // Actually write the output to the terminal
@@ -98,7 +98,7 @@ fn searchFileOrStdInRegex(input_file: *const std.fs.File, needle: []const u8, ma
 // a modified version of the to_seach with all the instances of needle highlighted
 // NOTE: It might be useful to update this to also return some statistics about the search,
 // like the number of matches, the indexes of the matches, etc.
-fn searchText(haystack: []const u8, needle: []const u8, handle: []u8) !void {
+fn searchText(haystack: []const u8, needle: []const u8, buffer: []u8) !void {
     var haystack_lines = std.mem.splitSequence(u8, haystack, "\n");
     var line_number: usize = 1;
     var index_of: usize = undefined;
@@ -108,7 +108,7 @@ fn searchText(haystack: []const u8, needle: []const u8, handle: []u8) !void {
 
     while (haystack_lines.next()) |line| : (line_number += 1) {
         index_of = std.mem.indexOf(u8, line, needle) orelse continue;
-        try writeOutput(line, needle, &writer, handle);
+        try writeOutput(line, needle, &writer, buffer);
     }
     try buf_writer.flush();
 }
