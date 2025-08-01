@@ -1,5 +1,5 @@
 const std = @import("std");
-const Benchmark = @import("deps/zBench//zbench.zig").Benchmark;
+const Benchmark = @import("zbench").Benchmark;
 
 // TODO: This can be updated to use std.mem.span and then allocator.dupeZ for better performance
 pub fn toCString(input: []const u8, allocator: std.mem.Allocator) ![:0]const u8 {

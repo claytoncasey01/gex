@@ -1,5 +1,5 @@
 const std = @import("std");
-const clap = @import("deps/zig-clap/clap.zig");
+const clap = @import("clap");
 const FoundItem = @import("types.zig").FoundItem;
 const colorizeWord = @import("output.zig").colorizeWord;
 const Color = @import("output.zig").Color;
@@ -60,7 +60,7 @@ pub fn main() !void {
     if (parsed_args.positionals.len == 2) {
         // Pull out our positional arguments
         const needle = parsed_args.positionals[0];
-        const haystack = parsed_args.positionals[1];
+        const haystack = parsed_args.positionals[1] orelse "";
         var needs_free = false;
 
         // In this case we most likely are dealing with a file or directory, just assume so for now
@@ -74,31 +74,31 @@ pub fn main() !void {
                     defer file.close();
 
                     // Allocate some memory for the strings
-                    const options = SearchOptions{ .input_file = &file, .needle = needle, .results = &found, .regex_path = use_regex, .matches = &matches, .allocator = allocator };
+                    const options = SearchOptions{ .input_file = &file, .needle = needle orelse "", .results = &found, .regex_path = use_regex, .matches = &matches, .allocator = allocator };
                     try search(options);
                 },
                 else => std.debug.print("{s} is not a file or directory\n", .{haystack}),
             }
         } else |err| switch (err) {
             error.FileNotFound => {
-                const options = SearchOptions{ .matches = &matches, .regex_path = use_regex, .haystack = haystack, .needle = needle, .results = &found, .allocator = allocator };
+                const options = SearchOptions{ .matches = &matches, .regex_path = use_regex, .haystack = haystack, .needle = needle orelse "", .results = &found, .allocator = allocator };
                 try search(options);
             },
             else => std.debug.print("An error occured", .{}),
         }
 
         // TODO: This is a bit of a hack, but it works for now
-        try writeOutput(&found, needle, OutputOptions{ .matches = &matches, .regex_path = use_regex, .line_number = true, .file_path = null, .needs_free = needs_free, .color = color }, allocator);
+        try writeOutput(&found, needle orelse "", OutputOptions{ .matches = &matches, .regex_path = use_regex, .line_number = true, .file_path = null, .needs_free = needs_free, .color = color }, allocator);
     } else if (parsed_args.positionals.len == 1) { // Assume we are getting piped input
         const needle = parsed_args.positionals[0];
         // This is esentially the same as searchFile, but we are reading from stdin
         // could probably be refactored to both use the same function.
         const stdin = std.io.getStdIn();
-        const options = SearchOptions{ .matches = &matches, .regex_path = use_regex, .input_file = &stdin, .needle = needle, .results = &found, .allocator = allocator };
+        const options = SearchOptions{ .matches = &matches, .regex_path = use_regex, .input_file = &stdin, .needle = needle orelse "", .results = &found, .allocator = allocator };
 
         try search(options);
 
-        try writeOutput(&found, needle, OutputOptions{ .matches = &matches, .regex_path = use_regex, .line_number = false, .file_path = null, .needs_free = true, .color = color }, allocator);
+        try writeOutput(&found, needle orelse "", OutputOptions{ .matches = &matches, .regex_path = use_regex, .line_number = false, .file_path = null, .needs_free = true, .color = color }, allocator);
     } else if (parsed_args.args.help != 0) {
         try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     } else {

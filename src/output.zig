@@ -3,7 +3,7 @@ const GenericWriter = std.io.GenericWriter;
 const ArrayList = std.ArrayList;
 const FoundItem = @import("types.zig").FoundItem;
 const Match = @import("regex.zig").Match;
-const Benchmark = @import("deps/zBench/zbench.zig").Benchmark;
+const Benchmark = @import("zbench").Benchmark;
 
 pub const Color = enum(u8) {
     reset,
