@@ -1,8 +1,9 @@
 const std = @import("std");
+const GenericWriter = std.io.GenericWriter;
 const ArrayList = std.ArrayList;
 const FoundItem = @import("types.zig").FoundItem;
 const Match = @import("regex.zig").Match;
-const Benchmark = @import("deps/zBench/zbench.zig").Benchmark;
+const Benchmark = @import("zbench").Benchmark;
 
 pub const Color = enum(u8) {
     reset,
@@ -123,6 +124,56 @@ pub fn colorizeWord(str: []const u8, word: []const u8, color: Color, allocator: 
     return result_string;
 }
 
+pub fn colorizeWordNoAlloc(str: []const u8, word: []const u8, color: Color, buffer: []u8) ![]const u8 {
+    const color_code = color.getCode();
+    const reset_code = Color.reset.getCode();
+    const extra_len_per_occurrence = color_code.len + reset_code.len;
+
+    if (word.len == 0) return str;
+
+    // Calculate the total occurences of `word` in `str`
+    var occurrences: usize = 0;
+    var i: usize = 0;
+    while (i < str.len) {
+        if (std.mem.startsWith(u8, str[i..], word)) {
+            occurrences += 1;
+            i += word.len;
+        } else {
+            i += 1;
+        }
+    }
+
+    if (occurrences == 0) return str;
+
+    // Calculate the length and allocate memory for the final colorized string
+    const result_string_len = str.len + (extra_len_per_occurrence * occurrences);
+
+    // Construct the `result_string` with colorized words
+    var result_index: usize = 0;
+    i = 0;
+    var current_str_ptr = str;
+
+    while (i < str.len) {
+        if (std.mem.startsWith(u8, current_str_ptr, word)) {
+            std.mem.copyForwards(u8, buffer[result_index..][0..color_code.len], color_code);
+            result_index += color_code.len;
+            std.mem.copyForwards(u8, buffer[result_index..][0..word.len], word);
+            result_index += word.len;
+            std.mem.copyForwards(u8, buffer[result_index..][0..reset_code.len], reset_code);
+            result_index += reset_code.len;
+            i += word.len;
+            current_str_ptr = str[i..];
+        } else {
+            buffer[result_index] = current_str_ptr[0];
+            result_index += 1;
+            i += 1;
+            current_str_ptr = str[i..];
+        }
+    }
+
+    return buffer[0..result_string_len];
+}
+
 fn benchMarkColorizeWord(allocator: std.mem.Allocator) void {
     const str = "Hello, world!";
     const word = "world";
@@ -188,5 +239,20 @@ pub fn writeOutput(found_items: *ArrayList(FoundItem), needle: []const u8, optio
 
             }
         }
+    }
+}
+
+// TODO: Currently this only writes the output to the console in the same way
+// as we were. This needs to handle various arguments for writting in different ways
+// for example, normal strings or structured data.
+// We also should have a specific type for w but they way writers work makes this hard, figure it out.
+pub fn writeOutputNew(line: []const u8, needle: []const u8, w: anytype, buffer: []u8) !void {
+    // Handle the regex path seperatly for now
+    if (false) {
+        const colorizedWord = try colorizeWordNoAlloc(line, needle, Color.green, buffer);
+        try w.print("{d} {s}{s}", .{ 0, colorizedWord, "\n" });
+    } else {
+        const colorizedWord = try colorizeWordNoAlloc(line, needle, Color.green, buffer);
+        try w.print("{s}{s}", .{ colorizedWord, "\n" });
     }
 }
