@@ -42,14 +42,7 @@ pub fn main() !void {
     };
     defer parsed_args.deinit();
 
-    var found = std.ArrayList(FoundItem).init(allocator);
-    defer found.deinit();
-
-    var matches = std.ArrayList(Match).init(allocator);
-    defer matches.deinit();
-
     var color: Color = Color.green;
-    const use_regex = parsed_args.args.regex != 0;
 
     // A color was passed, so pull it out
     if (parsed_args.args.color.len > 0) {
@@ -74,31 +67,26 @@ pub fn main() !void {
                     defer file.close();
 
                     // Allocate some memory for the strings
-                    const options = SearchOptions{ .input_file = &file, .needle = needle orelse "", .results = &found, .regex_path = use_regex, .matches = &matches, .allocator = allocator };
+                    const options = SearchOptions{ .input_file = &file, .needle = needle orelse "", .allocator = allocator };
                     try search(options);
                 },
                 else => std.debug.print("{s} is not a file or directory\n", .{haystack}),
             }
         } else |err| switch (err) {
             error.FileNotFound => {
-                const options = SearchOptions{ .matches = &matches, .regex_path = use_regex, .haystack = haystack, .needle = needle orelse "", .results = &found, .allocator = allocator };
+                const options = SearchOptions{ .haystack = haystack, .needle = needle orelse "", .allocator = allocator };
                 try search(options);
             },
             else => std.debug.print("An error occured", .{}),
         }
-
-        // TODO: This is a bit of a hack, but it works for now
-        try writeOutput(&found, needle orelse "", OutputOptions{ .matches = &matches, .regex_path = use_regex, .line_number = true, .file_path = null, .needs_free = needs_free, .color = color }, allocator);
     } else if (parsed_args.positionals.len == 1) { // Assume we are getting piped input
         const needle = parsed_args.positionals[0];
         // This is esentially the same as searchFile, but we are reading from stdin
         // could probably be refactored to both use the same function.
         const stdin = std.io.getStdIn();
-        const options = SearchOptions{ .matches = &matches, .regex_path = use_regex, .input_file = &stdin, .needle = needle orelse "", .results = &found, .allocator = allocator };
+        const options = SearchOptions{ .input_file = &stdin, .needle = needle orelse "", .allocator = allocator };
 
         try search(options);
-
-        try writeOutput(&found, needle orelse "", OutputOptions{ .matches = &matches, .regex_path = use_regex, .line_number = false, .file_path = null, .needs_free = true, .color = color }, allocator);
     } else if (parsed_args.args.help != 0) {
         try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     } else {
