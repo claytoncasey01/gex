@@ -3,7 +3,6 @@ const GenericWriter = std.io.GenericWriter;
 const ArrayList = std.ArrayList;
 const FoundItem = @import("types.zig").FoundItem;
 const Match = @import("regex.zig").Match;
-const Benchmark = @import("zbench").Benchmark;
 
 pub const Color = enum(u8) {
     reset,
@@ -174,16 +173,6 @@ pub fn colorizeWordNoAlloc(str: []const u8, word: []const u8, color: Color, buff
     return buffer[0..result_string_len];
 }
 
-fn benchMarkColorizeWord(allocator: std.mem.Allocator) void {
-    const str = "Hello, world!";
-    const word = "world";
-    const colorized = colorizeWord(str, word, Color.green, allocator) catch {
-        std.debug.print("Failed to colorize word\n", .{});
-        return;
-    };
-    defer allocator.free(colorized);
-}
-
 test "colorizeWord" {
     const allocator = std.testing.allocator;
     const str = "Hello, world!";
@@ -191,13 +180,6 @@ test "colorizeWord" {
     const colorized = try colorizeWord(str, word, Color.green, allocator);
     defer allocator.free(colorized);
     try std.testing.expectEqualStrings("Hello, \x1b[32mworld\x1b[0m!", colorized);
-}
-
-test "Benchmark Colorize Word" {
-    var bench = Benchmark.init(std.testing.allocator, .{});
-    defer bench.deinit();
-    try bench.add("Colorize Word", benchMarkColorizeWord, .{});
-    try bench.run(std.io.getStdOut().writer());
 }
 
 // Options for how the output is handled.
@@ -254,5 +236,67 @@ pub fn writeOutputNew(line: []const u8, needle: []const u8, w: anytype, buffer: 
     } else {
         const colorizedWord = try colorizeWordNoAlloc(line, needle, Color.green, buffer);
         try w.print("{s}{s}", .{ colorizedWord, "\n" });
+    }
+}
+
+pub fn writeColorizedOutput(
+    full_buffer: []const u8,
+    line_starts: []const usize,
+    match_positions: []const usize,
+    needle: []const u8,
+    color: Color,
+    writer: anytype,
+) !void {
+    const color_code = color.getCode();
+    const reset_code = Color.reset.getCode();
+
+    // Assume match_positions sorted
+    var match_idx: usize = 0;
+    for (line_starts, 0..) |line_start, idx| {
+        const line_end = if (idx + 1 < line_starts.len)
+            line_starts[idx + 1]
+        else
+            full_buffer.len;
+
+        // Peek: Skip if no matches in this line (DOD: avoid work on irrelevant data)
+        if (match_idx >= match_positions.len or
+            match_positions[match_idx] < line_start or
+            match_positions[match_idx] >= line_end) continue;
+
+        // Strip trailing \n if present
+        const actual_end = if (line_end > line_start and full_buffer[line_end - 1] == '\n')
+            line_end - 1
+        else
+            line_end;
+
+        const line = full_buffer[line_start..actual_end];
+
+        // Build colorized (single pass)
+        var pos: usize = 0;
+        while (match_idx < match_positions.len and
+            match_positions[match_idx] >= line_start and
+            match_positions[match_idx] < line_end)
+        {
+            const m_start = match_positions[match_idx] - line_start;
+            if (m_start < pos) {
+                match_idx += 1;
+                continue;
+            }
+
+            // Prefix
+            try writer.writeAll(line[pos..m_start]);
+
+            // Match
+            try writer.writeAll(color_code);
+            try writer.writeAll(line[m_start .. m_start + needle.len]);
+            try writer.writeAll(reset_code);
+
+            pos = m_start + needle.len;
+            match_idx += 1;
+        }
+
+        // Remainder + always newline (matches grep)
+        try writer.writeAll(line[pos..]);
+        try writer.writeByte('\n');
     }
 }

@@ -4,7 +4,6 @@ const toCString = @import("util.zig").toCString;
 const Color = @import("output.zig").Color;
 const colorizeWord = @import("output.zig").colorizeWord;
 const c = @cImport({
-    @cInclude("regex.h");
     @cInclude("regex_tiny.h");
 });
 

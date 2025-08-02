@@ -25,10 +25,8 @@ pub fn build(b: *std.Build) void {
     });
 
     const clap = b.dependency("clap", .{ .target = target, .optimize = optimize });
-    const zbench = b.dependency("zbench", .{ .target = target, .optimize = optimize });
 
     exe.root_module.addImport("clap", clap.module("clap"));
-    exe.root_module.addImport("zbench", zbench.module("zbench"));
 
     // Link up c libs
     const lib = b.addStaticLibrary(.{
@@ -78,10 +76,15 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    unit_tests.root_module.addImport("clap", clap.module("clap"));
+
+    // Link the same C library to tests
+    unit_tests.linkLibrary(lib);
+    unit_tests.addIncludePath(b.path("lib"));
+    unit_tests.linkLibC();
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
-    // Similar to creating the run step earlier, this exposes a `test` step to
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
