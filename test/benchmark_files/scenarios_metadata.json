@@ -1,0 +1,94 @@
+{
+  "generation_timestamp": "2024-01-01T00:00:00Z",
+  "total_scenarios": 8,
+  "scenarios": [
+    {
+      "name": "sparse_code_search",
+      "description": "Searching for specific function names in large codebase",
+      "target_lines": 100000,
+      "match_density": 0.005,
+      "search_term": "function",
+      "content_type": "code",
+      "clustering_factor": 0.3,
+      "avg_line_length": 60,
+      "line_length_variance": 30
+    },
+    {
+      "name": "rare_error_logs",
+      "description": "Finding rare error conditions in large log files",
+      "target_lines": 200000,
+      "match_density": 0.002,
+      "search_term": "ERROR",
+      "content_type": "logs",
+      "clustering_factor": 0.8,
+      "avg_line_length": 120,
+      "line_length_variance": 40
+    },
+    {
+      "name": "moderate_code_search",
+      "description": "Searching for common programming constructs",
+      "target_lines": 75000,
+      "match_density": 0.08,
+      "search_term": "function",
+      "content_type": "code",
+      "clustering_factor": 0.4,
+      "avg_line_length": 65,
+      "line_length_variance": 25
+    },
+    {
+      "name": "info_log_analysis",
+      "description": "Analyzing informational log entries",
+      "target_lines": 150000,
+      "match_density": 0.12,
+      "search_term": "INFO",
+      "content_type": "logs",
+      "clustering_factor": 0.2,
+      "avg_line_length": 110,
+      "line_length_variance": 50
+    },
+    {
+      "name": "dense_prose_search",
+      "description": "Searching for common words in documentation",
+      "target_lines": 50000,
+      "match_density": 0.25,
+      "search_term": "system",
+      "content_type": "prose",
+      "clustering_factor": 0.1,
+      "avg_line_length": 80,
+      "line_length_variance": 20
+    },
+    {
+      "name": "very_sparse_large",
+      "description": "Needle in haystack - very rare matches in huge file",
+      "target_lines": 500000,
+      "match_density": 0.0002,
+      "search_term": "function",
+      "content_type": "code",
+      "clustering_factor": 0.9,
+      "avg_line_length": 70,
+      "line_length_variance": 35
+    },
+    {
+      "name": "short_lines_dense",
+      "description": "Dense matches in short-line format (like config files)",
+      "target_lines": 30000,
+      "match_density": 0.15,
+      "search_term": "config",
+      "content_type": "code",
+      "clustering_factor": 0.3,
+      "avg_line_length": 25,
+      "line_length_variance": 10
+    },
+    {
+      "name": "long_lines_sparse",
+      "description": "Sparse matches in very long lines",
+      "target_lines": 20000,
+      "match_density": 0.03,
+      "search_term": "performance",
+      "content_type": "prose",
+      "clustering_factor": 0.2,
+      "avg_line_length": 200,
+      "line_length_variance": 100
+    }
+  ]
+}
