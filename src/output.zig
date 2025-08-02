@@ -3,6 +3,7 @@ const GenericWriter = std.io.GenericWriter;
 const ArrayList = std.ArrayList;
 const FoundItem = @import("types.zig").FoundItem;
 const Match = @import("regex.zig").Match;
+const SearchResults = @import("input.zig").SearchResults;
 
 pub const Color = enum(u8) {
     reset,
@@ -241,14 +242,17 @@ pub fn writeOutputNew(line: []const u8, needle: []const u8, w: anytype, buffer: 
 
 pub fn writeColorizedOutput(
     full_buffer: []const u8,
-    line_starts: []const usize,
-    match_positions: []const usize,
+    line_starts: []const u32,
+    match_positions: []const u32,
     needle: []const u8,
     color: Color,
     writer: anytype,
 ) !void {
     const color_code = color.getCode();
     const reset_code = Color.reset.getCode();
+
+    // Early exit: if not matches exist at all, don't do any work
+    if (match_positions.len == 0) return;
 
     // Assume match_positions sorted
     var match_idx: usize = 0;
@@ -258,7 +262,34 @@ pub fn writeColorizedOutput(
         else
             full_buffer.len;
 
-        // Peek: Skip if no matches in this line (DOD: avoid work on irrelevant data)
+        var temp_match_idx = match_idx;
+        var line_has_matches = false;
+
+        while (temp_match_idx < match_positions.len) {
+            const match_pos = match_positions[temp_match_idx];
+
+            // If this match is beyond the current line, we can stop scanning
+            if (match_pos >= line_end) break;
+
+            // If this match is within the current line, we found at least one match
+            if (match_pos >= line_start) {
+                line_has_matches = true;
+                break;
+            }
+
+            temp_match_idx += 1;
+        }
+
+        // If the line has no matches, skip it.
+        if (!line_has_matches) {
+            // Fast-forward match_idx past any matches that were before this line.
+            while (match_idx < match_positions.len and match_positions[match_idx] < line_start) {
+                match_idx += 1;
+            }
+            continue;
+        }
+
+        // Peek: Skip if no matches in this line
         if (match_idx >= match_positions.len or
             match_positions[match_idx] < line_start or
             match_positions[match_idx] >= line_end) continue;
@@ -269,34 +300,85 @@ pub fn writeColorizedOutput(
         else
             line_end;
 
-        const line = full_buffer[line_start..actual_end];
+        const line_content = full_buffer[line_start..actual_end];
 
-        // Build colorized (single pass)
-        var pos: usize = 0;
-        while (match_idx < match_positions.len and
-            match_positions[match_idx] >= line_start and
-            match_positions[match_idx] < line_end)
-        {
-            const m_start = match_positions[match_idx] - line_start;
-            if (m_start < pos) {
-                match_idx += 1;
-                continue;
-            }
+        // Pre-calculate how much work we need to do
+        // by counting matches in this line.
+        var matches_in_line: usize = 0;
+        var first_match_idx = match_idx;
 
-            // Prefix
-            try writer.writeAll(line[pos..m_start]);
+        // Advance our match_idx to the first match that's actually in this line
+        while (match_idx < match_positions.len and match_positions[match_idx] < line_start) {
+            match_idx += 1;
+        }
+        first_match_idx = match_idx;
 
-            // Match
-            try writer.writeAll(color_code);
-            try writer.writeAll(line[m_start .. m_start + needle.len]);
-            try writer.writeAll(reset_code);
-
-            pos = m_start + needle.len;
+        // Count how many matches are in this line
+        while (match_idx < match_positions.len and match_positions[match_idx] < line_end) {
+            matches_in_line += 1;
             match_idx += 1;
         }
 
-        // Remainder + always newline (matches grep)
-        try writer.writeAll(line[pos..]);
-        try writer.writeByte('\n');
+        // Handle wiritng matches differently depending on if we have a single match
+        // in the line or multiple.
+        if (matches_in_line == 1) {
+            try writeSingleMatchLine(line_content, line_start, match_positions[first_match_idx], needle, color_code, reset_code, writer);
+        } else {
+            try writeMultiMatchLine(line_content, line_start, match_positions[first_match_idx .. first_match_idx + matches_in_line], needle, color_code, reset_code, writer);
+        }
     }
+}
+
+// Writes everything as 3 consecutive chunks to minimize sys calls
+fn writeSingleMatchLine(line_content: []const u8, line_start: u32, match_position: u32, needle: []const u8, color_code: []const u8, reset_code: []const u8, writer: anytype) !void {
+    const match_offset = match_position - line_start;
+
+    // Chunk 1: Text before match
+    if (match_offset > 0) {
+        try writer.writeAll(line_content[0..match_offset]);
+    }
+
+    // Chunk 2: Colorized match
+    try writer.writeAll(color_code);
+    try writer.writeAll(line_content[match_offset .. match_offset + needle.len]);
+    try writer.writeAll(reset_code);
+
+    // Chunk 3: Text after the match + newline
+    const after_match = match_offset + needle.len;
+    if (after_match < line_content.len) {
+        try writer.writeAll(line_content[after_match..]);
+    }
+    try writer.writeByte('\n');
+}
+
+// Batch operations to reduce syscalls
+// NOTE(casey): We could use a pre-allocated buffer to batch multiple lines, maybe do this later
+fn writeMultiMatchLine(line_content: []const u8, line_start: u32, match_positions: []const u32, needle: []const u8, color_code: []const u8, reset_code: []const u8, writer: anytype) !void {
+    var pos: usize = 0;
+    // Process each match in sequence, building up the colorized line
+    for (match_positions) |match_pos| {
+        const match_offset = match_pos - line_start;
+
+        // make sure the match is actually within this line
+        if (match_offset >= line_content.len) continue;
+
+        // Write text before this match
+        if (match_offset > pos) {
+            try writer.writeAll(line_content[pos..match_offset]);
+        }
+
+        // Write colorized match
+        try writer.writeAll(color_code);
+        try writer.writeAll(line_content[match_offset .. match_offset + needle.len]);
+        try writer.writeAll(reset_code);
+
+        pos = match_offset + needle.len;
+    }
+
+    // Write any remaining text after the last match
+    if (pos < line_content.len) {
+        try writer.writeAll(line_content[pos..]);
+    }
+
+    try writer.writeByte('\n');
 }
